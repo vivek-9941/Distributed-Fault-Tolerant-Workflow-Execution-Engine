@@ -1,0 +1,21 @@
+SERVICE 1: WORKFLOW API SERVICE
+Responsibility: Acts as the entry point
+. Accepts dynamic workflow submissions (JSON) via REST, validates basic structure, persists workflow definitions and DAG edges to the DB, creates initial task_run entries (marked as PENDING), and publishes the workflow.started event
+. Everything must run inside a single DB transaction
+.
+What It Must NOT Do: It does not schedule tasks, execute logic, handle retries, or consume Kafka events
+.
+🧠 SERVICE 2: ORCHESTRATOR SERVICE
+Responsibility: The "brain" of the system
+. It listens to workflow.started, validates the DAG for cycles, maintains the dependency graph, and publishes runnable tasks to task.ready
+. When it consumes task.completed or task.failed, it updates the database, unlocks child tasks, and decides on retries or Dead Letter Queue (DLQ) routing
+. It also detects timeouts for tasks stuck in RUNNING
+.
+What It Must NOT Do: It performs no heavy computation or shell command execution
+.
+⚙ SERVICE 3: WORKER SERVICE
+Responsibility: The compute-heavy execution layer
+. It consumes from task.ready, marks the task as RUNNING atomically, and executes real system commands (e.g., git clone, mvn clean install) using Java's ProcessBuilder
+. After execution, it captures stdout/stderr, updates the database, commits the Kafka offset, and publishes task.completed or task.failed events
+.
+    

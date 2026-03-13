@@ -1,0 +1,24 @@
+Core Technologies
+Backend Services: Java 17+ and Spring Boot. Java provides modern concurrency APIs, and Spring Boot is used for the API, Orchestrator, and Worker services
+.
+Messaging: Apache Kafka and Spring Kafka. Used as the event backbone to decouple orchestration from execution, handle partition rebalancing, and provide durability, load balancing, and replay capability
+.
+Database: PostgreSQL. Perfect for strong transactional consistency to store workflows, dependencies, execution logs, and worker heartbeats
+.
+Concurrency: Java ExecutorService / ThreadPoolTaskExecutor. Allows async execution and controlled parallelism inside each worker pod
+.
+Containerization & Orchestration: Docker and Kubernetes. Used for containerizing services, deploying replicas, and enabling the Horizontal Pod Autoscaler (HPA)
+.
+Observability: Prometheus and Grafana, connected via Spring Actuator to expose metrics like Kafka lag and active workflows
+.
+Separation of Concerns: Kubernetes vs. Application Logic It is critical to separate infrastructure healing from workflow logic
+.
+Kubernetes Handles: Pod crash recovery, node failure rescheduling, horizontal scaling, and resource limits
+.
+Application (Orchestrator) Handles: DAG scheduling, timeout detection, retry rules, business state, and duplicate prevention
+. Kubernetes does not know what your task states are or how to reset a stuck task
+.
+Kafka Communication Flow The system relies on specific Kafka topics: workflow.started, task.ready, task.completed, task.failed, and task.dlq
+. The API uses a REST call to trigger the Orchestrator, but communication between the Orchestrator and Workers relies entirely on Kafka events to ensure loose coupling
+.
+

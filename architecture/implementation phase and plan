@@ -1,0 +1,20 @@
+Development Stages
+Stage 1 - Pure Local (No Kubernetes): Run API, Orchestrator, and multiple manual Worker instances locally from an IDE, with Kafka and PostgreSQL running via Docker Compose
+.
+Stage 2 - Local Kubernetes: Containerize the services into Docker images. Deploy to Minikube or Kind using a Helm chart for Kafka, Postgres, and the microservices. Enable Horizontal Pod Autoscaling (HPA)
+.
+Stage 3 - Cloud Deployment & Observability: Deploy to AWS EKS or GKE (optional). Add Prometheus and Grafana to track task latency, failure rates, and consumer lag
+.
+30-Day Practical Build Plan
+Week 1: Build the API service, DAG validation, and database schema
+.
+Week 2: Integrate Kafka and build the Worker execution engine
+.
+Week 3: Implement failure recovery, retry logic, DLQ, and idempotency logic
+.
+Week 4: Configure auto-scaling, set up metrics, and perform stress testing
+.
+Demonstration Scenario To demonstrate true distributed engineering, submit 100 to 500 workflows concurrently
+. As Kafka lag increases, show Kubernetes automatically scaling the worker pods
+. Manually kill a worker pod mid-execution to demonstrate Kubernetes restarting the pod, while the Orchestrator successfully detects the unfinished tasks, reassigns them, and completes the workflow without data loss
+.

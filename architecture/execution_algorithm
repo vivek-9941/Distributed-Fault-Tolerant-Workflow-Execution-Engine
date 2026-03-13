@@ -1,0 +1,15 @@
+Concurrency Model (Kafka + ExecutorService) Kafka handles the distribution of tasks across different worker pods via partition load balancing
+. However, a single Kafka partition can only be consumed by one thread
+. To maximize CPU usage, each worker pod uses a ThreadPoolTaskExecutor (e.g., thread pool size of 5)
+. The Kafka listener polls a task and submits it to the thread pool, allowing the listener to continue polling without blocking
+.
+Self-Healing & Fault Tolerance Logic If a worker crashes mid-execution, Kubernetes restarts the pod, but the task is still marked as RUNNING in the database
+. The system handles this via application-level recovery:
+Timeout Detection: The Orchestrator periodically queries the DB for tasks where status = RUNNING and last_heartbeat is older than the timeout limit
+. It then resets the task to READY, increments the retry count, and republishes it to Kafka
+.
+Exactly-Once Strategy: To prevent duplicate side effects, workers use idempotency keys
+. Updates follow a strict order: update task status in DB to SUCCESS inside a transaction, publish the completion event, and only then commit the Kafka offset
+.
+Dead Letter Queue (DLQ): If a task continuously fails and exceeds its max_retries, it is routed to a DLQ topic and marked as FAILED, which eventually fails the workflow
+.

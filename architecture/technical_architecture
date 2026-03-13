@@ -1,0 +1,187 @@
+Technical Architecture Specification: Distributed DAG-Based CI/CD Engine
+
+1. Executive Abstract and System Vision
+
+Modern enterprise CI/CD requirements have outpaced the capabilities of monolithic orchestration tools. To achieve high-velocity delivery, organizations require a specialized engine capable of managing complex dependency chains with granular control over concurrency and fault tolerance. This specification defines a distributed, Directed Acyclic Graph (DAG) based engine that decouples workflow logic from execution. By architecting a custom DAG engine rather than relying on off-the-shelf monoliths, we eliminate the head-of-line blocking common in shared-resource environments and provide the deterministic execution necessary for large-scale build pipelines.
+
+The core engineering philosophy of this system is "Infrastructure-Aware but Logic-Independent." The system is designed to thrive within Kubernetes, leveraging its container management capabilities, but its logical integrity is self-contained. The engine treats the underlying orchestration layer as volatile; it recognizes that while Kubernetes can restart a container, it cannot resolve a logical stall in a build pipeline or recover a stateful task dependency. Consequently, the system maintains its own state machine and recovery protocols, providing a robust layer of business-logic resilience that survives infrastructure-level disruptions.
+
+This vision is realized through a strictly decoupled microservice architecture, where high-level scheduling and heavy compute execution are isolated to prevent resource starvation.
+
+
+--------------------------------------------------------------------------------
+
+
+2. Microservice Decomposition and Functional Roles
+
+To achieve independent scaling and fault isolation, the architecture is decomposed into three primary tiers. This split ensures that API traffic spikes do not disrupt task scheduling, and compute-heavy builds do not starve the orchestrator of CPU cycles.
+
+Service Responsibility Matrix
+
+Service Name	Primary Responsibility	Critical Constraints
+API Service	Submission, JSON validation, and initial metadata persistence.	Must enforce transactional integrity across multiple tables during the initial DAG storage.
+Orchestrator Service	DAG analysis, task scheduling, and state transition management.	Must process events idempotently to handle Kafka rebalance-induced redelivery; must remain lightweight.
+Worker Service	Heavy compute execution, log capture, and heartbeat emission.	Must remain stateless to allow for aggressive HPA downscaling and provide exactly-once side-effect mitigation.
+
+The "So What?" of Strategic Decoupling
+
+The decoupling of the Orchestrator and Worker is not merely for scale, but for Resource Isolation. In a unified system, a massive Maven build or a memory-intensive integration test could starve the scheduling logic of resources, leading to system-wide stalls. By isolating the Worker Cluster, we ensure the Orchestrator remains responsive to system events regardless of the compute load. This separation allows the Orchestrator to focus on the health of the entire cluster while Workers scale elastically based on the specific demands of the task queue.
+
+With the service boundaries established, the underlying data structures must provide the source of truth for these interactions.
+
+
+--------------------------------------------------------------------------------
+
+
+3. Data Modeling and State Machine Specification
+
+Distributed workflow integrity relies on a centralized, transactionally consistent state store. PostgreSQL is the mandatory choice here to manage the complex relational data of graph-based workflows.
+
+Detailed State Machine Mapping
+
+Each task follows a deterministic transition logic managed by the Orchestrator:
+
+* PENDING
+  * Trigger: Workflow submission via the API.
+  * System Action: Metadata is persisted; the task waits for parent dependency resolution.
+* READY
+  * Trigger: All parent dependencies reach SUCCESS.
+  * System Action: Orchestrator publishes a message to the task.ready Kafka topic.
+* RUNNING
+  * Trigger: A Worker consumes the message from the task.ready topic.
+  * System Action: Worker performs an atomic update (UPDATE ... WHERE status = 'READY') to claim the task and begins execution.
+* SUCCESS / FAILED
+  * Trigger: The underlying system process (e.g., shell script) exits.
+  * System Action: Worker publishes a completion/failure event to Kafka and updates the final state in the DB.
+
+Schema Blueprint
+
+The following tables are required to maintain distributed state and DAG edges:
+
+workflows Stores reusable templates (ID, name, version, created_at).
+
+workflow_runs Tracks specific execution instances (ID, workflow_id, status, started_at, completed_at).
+
+task_definitions Static node config (ID, workflow_id, name, task_type, timeout_seconds, max_retries).
+
+task_dependencies The DAG edge table (ID, workflow_id, parent_task_id, child_task_id).
+
+task_runs The execution state (ID, workflow_run_id, task_definition_id, status, worker_id, retry_count, last_heartbeat).
+
+This state-tracking logic informs the event-driven communication layer, ensuring every transition is recorded before it is broadcast.
+
+
+--------------------------------------------------------------------------------
+
+
+4. Event-Driven Backbone: Kafka Topic Strategy
+
+Apache Kafka serves as the system's nervous system. It was selected over REST for its durability, inherent back-pressure handling, and the ability to buffer tasks if the Worker Cluster reaches maximum capacity.
+
+Kafka Topic Registry
+
+* workflow.started: Producer: API Service | Consumer: Orchestrator. Triggers initial DAG analysis.
+* task.ready: Producer: Orchestrator | Consumer: Worker. Signals a task is unblocked and ready for execution.
+* task.completed: Producer: Worker | Consumer: Orchestrator. Signals successful execution to unlock children.
+* task.failed: Producer: Worker | Consumer: Orchestrator. Triggers retry logic or workflow failure.
+* task.dlq: Producer: Worker/Orchestrator | Consumer: Monitoring Systems. Holds tasks that have exhausted all retries for manual intervention.
+
+Strategic Partitioning and Trade-offs
+
+The system utilizes workflowId as the partition key. This ensures strict ordering of events within a single workflow—essential for preventing a "Test" completion from being processed before its "Build" step. However, this introduces a "Hot Workflow" risk: a massive workflow with thousands of parallel tasks could create a partition hotspot. To mitigate this, the Worker must use internal multi-threading to drain the partition quickly.
+
+Having established the event-driven backbone, we must now define the logic the Orchestrator uses to navigate the resulting graph.
+
+
+--------------------------------------------------------------------------------
+
+
+5. DAG Validation and Scheduling Logic
+
+To prevent logical deadlocks, the API Service performs Depth-First Search (DFS) based validation upon submission to detect and reject cyclic dependencies.
+
+The Scheduling Algorithm: In-Degree Reduction
+
+The Orchestrator utilizes an "In-Degree" reduction logic to manage the DAG:
+
+1. Initialization: Each task's "in-degree" is the count of its parent dependencies defined in task_dependencies.
+2. Unblocking: Tasks with an in-degree of zero are moved to READY.
+3. Progression: As task.completed events arrive, the Orchestrator decrements the in-degree of all child tasks in the DB.
+4. Activation: Once a child’s in-degree hits zero, it is published to the task.ready topic.
+
+This Topological Sort ensures prerequisites like CLONE are strictly satisfied before BUILD or TEST phases begin. Once "unlocked," these tasks are distributed to the worker cluster for execution.
+
+
+--------------------------------------------------------------------------------
+
+
+6. The Worker Execution Model: Concurrency and Idempotency
+
+The worker nodes implement a dual-layer concurrency model. Kafka handles inter-pod scaling across the cluster, while the Java ExecutorService manages intra-pod parallelism, allowing a single worker to execute multiple tasks simultaneously without blocking the Kafka consumer thread.
+
+Worker Internals and Stream Gobblers
+
+Workers utilize ProcessBuilder to invoke system commands (e.g., git, mvn). To prevent the worker from hanging due to full output buffers, workers must implement Asynchronous Stream Gobblers—dedicated threads or non-blocking I/O to drain stdout and stderr in real-time, mapping logs to the task_logs table.
+
+The Idempotency Mandate and Exactly-Once Semantics
+
+In a distributed environment, a worker might crash after execution but before committing its Kafka offset. To prevent duplicate side-effects (e.g., deploying code twice), the system mandates Exactly-Once Semantics via a transactional sequence:
+
+1. Start DB Transaction.
+2. Update Task Status to SUCCESS (using an atomic WHERE status = 'RUNNING' check).
+3. Publish Event to task.completed.
+4. Commit DB Transaction.
+5. Commit Kafka Offset. If a crash occurs before Step 4, the DB rolls back, the Kafka offset is not committed, and the task is safely retried by another worker.
+
+
+--------------------------------------------------------------------------------
+
+
+7. Resilience and Application-Level Self-Healing
+
+The architecture distinguishes between Infrastructure Healing and Logical Healing.
+
+Failure Scenario Analysis
+
+Failure Scenario	System Response
+Worker Process Hang	Orchestrator detects last_heartbeat timeout in task_runs; resets task to READY.
+Node/Pod Death	Kubernetes restarts the pod; Kafka Partition Rebalancing triggers reassignment of uncommitted tasks.
+Task Script Error	Worker emits task.failed; Orchestrator increments retry_count and applies backoff.
+
+Retry Strategy
+
+The system implements exponential backoff for failures. If a task fails, it is rescheduled with increasing delays. Only after the max_retries defined in task_definitions is exhausted is the task moved to the Dead Letter Queue (DLQ), triggering a terminal failure for the entire workflow run.
+
+
+--------------------------------------------------------------------------------
+
+
+8. Deployment Architecture and Elastic Scaling
+
+The engine leverages the synergy between Kafka consumer lag and Kubernetes Horizontal Pod Autoscaling (HPA).
+
+Mathematical Scaling Logic
+
+The relationship between partitions and scaling is a hard constraint. Let P be the number of partitions in the task.ready topic and R be the number of Worker replicas. The system maintains: R \leq P Scaling R beyond P yields zero benefit, as the additional replicas will remain idle. Scaling is triggered when "Lag > Threshold," but is capped by P.
+
+Graceful Shutdown
+
+To maintain integrity during down-scaling, Workers must handle the SIGTERM signal. Upon receipt, the Worker stops polling Kafka, allows in-flight ProcessBuilder tasks to complete, commits final offsets, and then terminates.
+
+
+--------------------------------------------------------------------------------
+
+
+9. Observability and System Health Metrics
+
+Real-time telemetry is non-negotiable for distributed orchestration. The system exposes the "Critical Five" metrics:
+
+* Task Latency: Time from READY to SUCCESS. Measures worker efficiency.
+* Consumer Lag: Unprocessed messages in task.ready. Primary trigger for HPA.
+* Success Rate: Ratio of SUCCESS to FAILED tasks. Identifies environment instability.
+* Worker Heartbeat Age: Time since last worker check-in. Detects "zombie" pods.
+* Retry Frequency: Volume of task.failed events. Points to unstable dependencies or flakiness.
+
+Final Summary
+
+By combining rigorous DAG orchestration, event-driven decoupling via Kafka, and a self-healing worker model, this architecture creates an Elite-Level CI/CD engine. It ensures workflows are processed with maximum parallelism, protected against infrastructure failures, and fully observable through every transition in the graph.

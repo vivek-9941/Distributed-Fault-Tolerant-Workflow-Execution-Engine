@@ -1,0 +1,24 @@
+This database schema leverages PostgreSQL to support dynamic DAGs, parallel tasks, and crash recovery
+.
+1️⃣ workflows & workflow_runs
+workflows: Stores reusable workflow templates. Columns: id (UUID), name, version, created_at, updated_at
+.
+workflow_runs: Stores execution instances. Columns: id, workflow_id (FK), status (PENDING, RUNNING, SUCCESS, FAILED), triggered_by, started_at, completed_at
+.
+2️⃣ task_definitions & task_dependencies
+task_definitions: Defines DAG nodes. Columns: id, workflow_id, name, task_type (CLONE, BUILD, TEST, REPORT), timeout_seconds, max_retries
+.
+task_dependencies: Defines DAG edges. Columns: id, workflow_id, parent_task_id, child_task_id
+.
+3️⃣ task_runs (Critical Execution State)
+Tracks exact execution states to power self-healing. Columns: id, workflow_run_id, task_definition_id, status (PENDING, READY, RUNNING, SUCCESS, FAILED), retry_count, worker_id, started_at, last_heartbeat, error_message
+.
+State Machine: PENDING → READY → RUNNING → SUCCESS / FAILED. If FAILED and under max retries → READY. If retry exhausted → DLQ
+.
+4️⃣ task_logs & workers
+task_logs: Stores execution logs (stdout, stderr)
+.
+workers: Tracks active worker pods (heartbeats)
+.
+Crucial Indexes: To prevent slow scheduling, indexes are required on status, workflow_run_id, parent_task_id, and worker_id
+.
