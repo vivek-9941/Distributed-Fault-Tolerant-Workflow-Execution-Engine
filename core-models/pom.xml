@@ -67,10 +67,7 @@
 
 	<build>
 		<plugins>
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-			</plugin>
+			<!-- Library module, no spring-boot-maven-plugin needed -->
 		</plugins>
 	</build>
 

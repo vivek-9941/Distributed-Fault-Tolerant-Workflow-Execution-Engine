@@ -27,6 +27,9 @@ public class TaskDefinition {
     @Column(name = "max_retries")
     private Integer maxRetries;
 
+    @Column(name = "command", columnDefinition = "TEXT")
+    private String command;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -88,6 +91,14 @@ public class TaskDefinition {
 
     public void setMaxRetries(Integer maxRetries) {
         this.maxRetries = maxRetries;
+    }
+
+    public String getCommand() {
+        return command;
+    }
+
+    public void setCommand(String command) {
+        this.command = command;
     }
 
     public LocalDateTime getCreatedAt() {
