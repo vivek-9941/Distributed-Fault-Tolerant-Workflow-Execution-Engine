@@ -34,6 +34,12 @@ public class TaskRun {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    @Column(name = "last_heartbeat")
+    private LocalDateTime lastHeartbeat;
+
+    @Column(name = "error_message", columnDefinition = "TEXT")
+    private String errorMessage;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -111,5 +117,21 @@ public class TaskRun {
 
     public void setCompletedAt(LocalDateTime completedAt) {
         this.completedAt = completedAt;
+    }
+
+    public LocalDateTime getLastHeartbeat() {
+        return lastHeartbeat;
+    }
+
+    public void setLastHeartbeat(LocalDateTime lastHeartbeat) {
+        this.lastHeartbeat = lastHeartbeat;
+    }
+
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+
+    public void setErrorMessage(String errorMessage) {
+        this.errorMessage = errorMessage;
     }
 }
