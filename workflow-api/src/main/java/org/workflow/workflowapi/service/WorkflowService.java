@@ -61,6 +61,7 @@ public class WorkflowService {
                 taskDef.setTaskType(TaskDefinition.TaskType.valueOf(taskDto.type().toUpperCase()));
                 taskDef.setTimeoutSeconds(taskDto.timeoutSeconds() != null ? taskDto.timeoutSeconds() : 300);
                 taskDef.setMaxRetries(taskDto.maxRetries() != null ? taskDto.maxRetries() : 3);
+                taskDef.setCommand(taskDto.command() != null ? taskDto.command() : "echo No command specified");
                 taskDefinitionRepository.save(taskDef);
 
                 // Dependencies
