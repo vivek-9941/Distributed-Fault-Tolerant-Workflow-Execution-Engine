@@ -10,7 +10,6 @@ import org.workflow.coremodels.event.TaskReadyEvent;
 import org.workflow.coremodels.event.WorkflowStartedEvent;
 import org.workflow.coremodels.model.*;
 import org.workflow.coremodels.repository.*;
-
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -175,8 +174,8 @@ public class OrchestratorService {
 
             log.info("Task {} retrying (attempt {}/{})", event.taskRunId(), event.retryCount() + 1, maxRetries);
         } else {
-            // Max retries exhausted — fail the task and the workflow
-            failedTask.setStatus(TaskRun.Status.FAILED);
+            // Max retries exhausted — move to DLQ and fail the workflow
+            failedTask.setStatus(TaskRun.Status.DLQ);
             failedTask.setErrorMessage(event.errorMessage());
             failedTask.setCompletedAt(LocalDateTime.now());
             taskRunRepository.save(failedTask);
@@ -188,7 +187,7 @@ public class OrchestratorService {
                 workflowRunRepository.save(workflowRun);
             }
 
-            log.error("Task {} exhausted retries ({}/{}). Workflow {} FAILED.",
+            log.error("Task {} exhausted retries ({}/{}). Moved to DLQ. Workflow {} FAILED.",
                     event.taskRunId(), event.retryCount(), maxRetries, event.workflowRunId());
         }
     }
@@ -220,7 +219,7 @@ public class OrchestratorService {
     private void checkWorkflowCompletion(UUID workflowRunId) {
         List<TaskRun> allTasks = taskRunRepository.findByWorkflowRunId(workflowRunId);
         boolean allDone = allTasks.stream().allMatch(t ->
-                t.getStatus() == TaskRun.Status.SUCCESS || t.getStatus() == TaskRun.Status.FAILED);
+                t.getStatus() == TaskRun.Status.SUCCESS || t.getStatus() == TaskRun.Status.FAILED || t.getStatus() == TaskRun.Status.DLQ);
         boolean allSuccess = allTasks.stream().allMatch(t -> t.getStatus() == TaskRun.Status.SUCCESS);
 
         if (allDone) {
