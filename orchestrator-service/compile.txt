@@ -1,0 +1,42 @@
+﻿[INFO] Scanning for projects...
+[INFO] 
+[INFO] -----------------< org.workflow:orchestrator-service >------------------
+[INFO] Building orchestrator-service 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.5.0:clean (default-clean) @ orchestrator-service ---
+[INFO] Deleting C:\Users\Lenovo\Desktop\springbt\workflow_project\orchestrator-service\target
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ orchestrator-service ---
+[INFO] Copying 2 resources from src\main\resources to target\classes
+[INFO] Copying 0 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.14.1:compile (default-compile) @ orchestrator-service ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 5 source files with javac [debug parameters release 21] to target\classes
+[INFO] -------------------------------------------------------------
+[ERROR] COMPILATION ERROR : 
+[INFO] -------------------------------------------------------------
+[ERROR] /C:/Users/Lenovo/Desktop/springbt/workflow_project/orchestrator-service/src/main/java/org/workflow/orchestratorservice/OrchestratorServiceApplication.java:[5,53] package org.springframework.boot.autoconfigure.domain does not exist
+[ERROR] /C:/Users/Lenovo/Desktop/springbt/workflow_project/orchestrator-service/src/main/java/org/workflow/orchestratorservice/OrchestratorServiceApplication.java:[10,2] cannot find symbol
+  symbol: class EntityScan
+[INFO] 2 errors 
+[INFO] -------------------------------------------------------------
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  4.593 s
+[INFO] Finished at: 2026-03-15T12:55:42+05:30
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.14.1:compile (default-compile) on project orchestrator-service: Compilation failure: Compilation failure: 
+[ERROR] /C:/Users/Lenovo/Desktop/springbt/workflow_project/orchestrator-service/src/main/java/org/workflow/orchestratorservice/OrchestratorServiceApplication.java:[5,53] package org.springframework.boot.autoconfigure.domain does not exist
+[ERROR] /C:/Users/Lenovo/Desktop/springbt/workflow_project/orchestrator-service/src/main/java/org/workflow/orchestratorservice/OrchestratorServiceApplication.java:[10,2] cannot find symbol
+[ERROR]   symbol: class EntityScan
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
