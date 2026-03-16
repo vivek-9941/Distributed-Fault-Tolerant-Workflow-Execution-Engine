@@ -40,3 +40,12 @@ orchestrator:
   timeout:
     check-interval-ms: 30000
     heartbeat-threshold-seconds: 120
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
