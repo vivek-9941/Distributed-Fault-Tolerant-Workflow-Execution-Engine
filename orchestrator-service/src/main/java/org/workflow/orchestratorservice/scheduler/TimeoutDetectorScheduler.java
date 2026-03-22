@@ -12,10 +12,8 @@ import org.workflow.coremodels.model.TaskRun;
 import org.workflow.coremodels.repository.TaskDefinitionRepository;
 import org.workflow.coremodels.repository.TaskRunRepository;
 import org.workflow.orchestratorservice.service.OrchestratorKafkaProducerService;
-
 import java.time.LocalDateTime;
 import java.util.List;
-
 /**
  * Periodically checks for tasks stuck in RUNNING state with stale heartbeats.
  * Resets them to READY for re-execution (application-level self-healing).

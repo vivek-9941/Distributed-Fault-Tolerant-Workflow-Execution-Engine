@@ -5,8 +5,8 @@ services:
     image: mysql:8.0
     container_name: workflow-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: workflow_db
+      MYSQL_ROOT_PASSWORD: "899961"
+      MYSQL_DATABASE: workflow
     ports:
       - "3306:3306"
     volumes:
