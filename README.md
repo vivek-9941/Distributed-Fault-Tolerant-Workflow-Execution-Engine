@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Distributed Fault-Tolerant CI/CD Workflow Execution Engine
 
 ## Abstract
@@ -69,3 +70,13 @@ Kafka represents the system's nervous system:
 3.  Kubernetes automatically detects lag through metrics and scales `Worker Service` replicas via HPA up to Kafka partition maximum counts.
 4.  Simulate hardware failure by purposefully terminating a working pod mid-execution. 
 5.  Watch the `Orchestrator Service` intelligently timeout the zombie task and re-queue it seamlessly without duplicate operations.
+=======
+## License
+
+This project is licensed under the Apache License 2.0.
+
+You may obtain a copy of the License at:
+http://www.apache.org/licenses/LICENSE-2.0
+
+See the LICENSE file for full details.
+>>>>>>> 5ba5eb91f5dd7993b3579beade65d07bfb74ebfb
